@@ -1,0 +1,30 @@
+[
+  {
+    "_comment": "Add real CFC match results here. Only wins are needed for the transitive chain.",
+    "_format": "winner, loser, winner_score, loser_score, date (YYYY-MM-DD), competition"
+  },
+  {
+    "winner": "Chattanooga FC",
+    "loser": "Atlanta United 2",
+    "ws": 3,
+    "ls": 1,
+    "date": "2024-06-15",
+    "comp": "MLS NEXT Pro"
+  },
+  {
+    "winner": "Chattanooga FC",
+    "loser": "Nashville SC II",
+    "ws": 2,
+    "ls": 0,
+    "date": "2024-07-20",
+    "comp": "MLS NEXT Pro"
+  },
+  {
+    "winner": "Chattanooga FC",
+    "loser": "Inter Miami CF II",
+    "ws": 4,
+    "ls": 1,
+    "date": "2024-05-10",
+    "comp": "MLS NEXT Pro"
+  }
+]
