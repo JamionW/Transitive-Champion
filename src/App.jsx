@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 
-// graph utilities
+// --- graph utilities ---
 
 function buildGraph(matches) {
   const graph = new Map();
@@ -18,30 +18,110 @@ function buildGraph(matches) {
   return graph;
 }
 
-function findTransitiveChampionships(graph, startTeam, champMap, maxDepth = 8, maxPathsPerTrophy = 30) {
+// phase 1: BFS with permanent visited set.
+// finds every reachable trophy within maxDepth hops.
+// O(V+E); finishes in milliseconds regardless of team.
+// returns a Map keyed by trophy name, with one shortest path per year entry.
+function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
+  const parent = new Map();
+  parent.set(startTeam, null);
+  const queue = [{ team: startTeam, depth: 0 }];
   const results = new Map();
 
-  function dfs(team, path, visited) {
-    if (path.length > maxDepth) return;
+  function reconstructPath(toTeam) {
+    const path = [];
+    let cur = toTeam;
+    while (parent.get(cur)) {
+      const p = parent.get(cur);
+      path.unshift(p.edge);
+      cur = p.from;
+    }
+    return path;
+  }
 
+  let head = 0;
+  while (head < queue.length) {
+    const { team, depth } = queue[head++];
+
+    // check for trophies (skip start team; that's a direct win, handled separately)
     const trophies = champMap.get(team);
-    if (trophies && path.length > 0) {
+    if (trophies && team !== startTeam) {
       for (const t of trophies) {
-        const key = t.trophy;
-        if (!results.has(key)) results.set(key, { trophy: t.trophy, years: {} });
-        const entry = results.get(key);
-        if (!entry.years[t.year]) entry.years[t.year] = { year: t.year, team: t.team, paths: [] };
-        if (entry.years[t.year].paths.length < maxPathsPerTrophy) {
-          entry.years[t.year].paths.push([...path]);
+        if (!results.has(t.trophy)) results.set(t.trophy, { trophy: t.trophy, years: {} });
+        const entry = results.get(t.trophy);
+        // only store first discovery per year (BFS guarantees shortest)
+        if (!entry.years[t.year]) {
+          entry.years[t.year] = {
+            year: t.year,
+            team: t.team,
+            shortestPath: reconstructPath(team),
+          };
         }
       }
     }
 
-    const neighbors = graph.get(team) || [];
-    for (const edge of neighbors) {
+    if (depth >= maxDepth) continue;
+
+    for (const edge of (graph.get(team) || [])) {
+      if (!parent.has(edge.loser)) {
+        parent.set(edge.loser, {
+          from: team,
+          edge: {
+            from: team, to: edge.loser,
+            ws: edge.ws, ls: edge.ls,
+            date: edge.date, comp: edge.comp,
+          },
+        });
+        queue.push({ team: edge.loser, depth: depth + 1 });
+      }
+    }
+  }
+
+  return results;
+}
+
+// phase 2: targeted DFS with backtracking.
+// searches only for paths reaching specific target teams.
+// caps at maxPathsPerTarget found paths per target.
+// safety time budget prevents runaway on extremely dense subgraphs.
+function findPathsToTargets(graph, startTeam, targetTeams, maxDepth = 8, maxPathsPerTarget = 30) {
+  const targetSet = new Set(targetTeams);
+  const found = new Map();
+  for (const t of targetTeams) found.set(t, []);
+
+  const totalMax = targetTeams.length * maxPathsPerTarget;
+  let totalFound = 0;
+  const startTime = Date.now();
+  const timeBudgetMs = 8000;
+  let expired = false;
+  let calls = 0;
+
+  function dfs(team, path, visited) {
+    if (expired || path.length > maxDepth || totalFound >= totalMax) return;
+
+    if (++calls % 10000 === 0 && Date.now() - startTime > timeBudgetMs) {
+      expired = true;
+      return;
+    }
+
+    if (targetSet.has(team) && path.length > 0) {
+      const teamPaths = found.get(team);
+      if (teamPaths.length < maxPathsPerTarget) {
+        teamPaths.push([...path]);
+        totalFound++;
+        if (totalFound >= totalMax) return;
+      }
+    }
+
+    for (const edge of (graph.get(team) || [])) {
+      if (expired || totalFound >= totalMax) return;
       if (!visited.has(edge.loser)) {
         visited.add(edge.loser);
-        path.push({ from: team, to: edge.loser, ws: edge.ws, ls: edge.ls, date: edge.date, comp: edge.comp });
+        path.push({
+          from: team, to: edge.loser,
+          ws: edge.ws, ls: edge.ls,
+          date: edge.date, comp: edge.comp,
+        });
         dfs(edge.loser, path, visited);
         path.pop();
         visited.delete(edge.loser);
@@ -51,10 +131,11 @@ function findTransitiveChampionships(graph, startTeam, champMap, maxDepth = 8, m
 
   const visited = new Set([startTeam]);
   dfs(startTeam, [], visited);
-  return results;
+  return { found, partial: expired };
 }
 
-// tier classification for trophy display
+// --- tier classification ---
+
 function trophyTier(trophy) {
   if (trophy.includes("Champions League") || trophy.includes("Champions Cup")) return 0;
   if (["Premier League", "La Liga", "Bundesliga", "Serie A", "Ligue 1"].some((l) => trophy.includes(l))) return 1;
@@ -66,6 +147,8 @@ function trophyTier(trophy) {
 
 const TIER_LABELS = ["Continental", "Top 5 League", "Concacaf / Leagues Cup", "MLS", "Other Major League", "Other"];
 const TIER_COLORS = ["#D4A843", "#C0C0C0", "#E07040", "#5B8A72", "#CD7F32", "#7A8599"];
+
+// --- component ---
 
 export default function App() {
   const [data, setData] = useState(null);
@@ -79,6 +162,14 @@ export default function App() {
   const [computing, setComputing] = useState(false);
   const searchRef = useRef(null);
 
+  // BFS trophy discovery results (set on team select)
+  const [trophyResults, setTrophyResults] = useState(null);
+
+  // targeted DFS path results, keyed by trophy name (loaded on expand)
+  // shape: { [trophyKey]: { yearPaths: { [year]: path[] }, partial: bool } }
+  const [trophyPaths, setTrophyPaths] = useState({});
+  const [loadingPaths, setLoadingPaths] = useState(null);
+
   // close suggestions on outside click
   useEffect(() => {
     function handleClickOutside(e) {
@@ -90,7 +181,7 @@ export default function App() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // load data on mount
+  // load graph data on mount
   useEffect(() => {
     fetch("/graph_data.json")
       .then((r) => {
@@ -124,28 +215,55 @@ export default function App() {
   }, [data]);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return teams.slice(0, 50); // limit dropdown when empty
+    if (!query.trim()) return teams.slice(0, 50);
     const q = query.toLowerCase();
     return teams.filter((t) => t.toLowerCase().includes(q)).slice(0, 50);
   }, [query, teams]);
 
-  // run DFS in a timeout so the UI can show "computing..." for large graphs
-  const [results, setResults] = useState(null);
-
+  // phase 1: BFS on team select (instant, O(V+E))
   useEffect(() => {
     if (!selectedTeam || !graph || !champMap) {
-      setResults(null);
+      setTrophyResults(null);
       return;
     }
     setComputing(true);
     const timeout = setTimeout(() => {
-      const r = findTransitiveChampionships(graph, selectedTeam, champMap);
-      const arr = [...r.values()].sort((a, b) => trophyTier(a.trophy) - trophyTier(b.trophy));
-      setResults(arr);
+      const discovered = discoverTrophies(graph, selectedTeam, champMap);
+      const arr = [...discovered.values()].sort((a, b) => trophyTier(a.trophy) - trophyTier(b.trophy));
+      setTrophyResults(arr);
       setComputing(false);
     }, 10);
     return () => clearTimeout(timeout);
   }, [selectedTeam, graph, champMap]);
+
+  // phase 2: targeted DFS on trophy expand
+  useEffect(() => {
+    if (!expandedTrophy || !selectedTeam || !graph || !trophyResults) return;
+    if (trophyPaths[expandedTrophy]) return;
+
+    const trophyEntry = trophyResults.find((r) => r.trophy === expandedTrophy);
+    if (!trophyEntry) return;
+
+    // collect unique target teams for this trophy
+    const targetTeams = [...new Set(Object.values(trophyEntry.years).map((y) => y.team))];
+
+    setLoadingPaths(expandedTrophy);
+
+    const timeout = setTimeout(() => {
+      const { found, partial } = findPathsToTargets(graph, selectedTeam, targetTeams);
+
+      // organize paths by year
+      const yearPaths = {};
+      for (const ye of Object.values(trophyEntry.years)) {
+        yearPaths[ye.year] = found.get(ye.team) || [];
+      }
+
+      setTrophyPaths((prev) => ({ ...prev, [expandedTrophy]: { yearPaths, partial } }));
+      setLoadingPaths(null);
+    }, 10);
+
+    return () => clearTimeout(timeout);
+  }, [expandedTrophy, selectedTeam, graph, trophyResults, trophyPaths]);
 
   // direct championships (zero hops)
   const directTrophies = useMemo(() => {
@@ -165,12 +283,16 @@ export default function App() {
     setShowDropdown(false);
     setExpandedTrophy(null);
     setExpandedPath(null);
+    setTrophyPaths({});
+    setLoadingPaths(null);
   }, []);
 
-  const totalTrophies = (results ? results.reduce((sum, r) => sum + Object.keys(r.years).length, 0) : 0)
-    + directTrophies.reduce((sum, t) => sum + t.years.length, 0);
+  const totalTrophies = (trophyResults
+    ? trophyResults.reduce((sum, r) => sum + Object.keys(r.years).length, 0)
+    : 0) + directTrophies.reduce((sum, t) => sum + t.years.length, 0);
 
-  // loading / error states
+  // --- render ---
+
   if (loading) {
     return (
       <div style={{ minHeight: "100vh", background: "#0B1120", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -235,12 +357,14 @@ export default function App() {
               setShowDropdown(true);
               setExpandedTrophy(null);
               setExpandedPath(null);
+              setTrophyPaths({});
             }}
             onFocus={() => {
               if (selectedTeam) {
                 setSelectedTeam(null);
                 setExpandedTrophy(null);
                 setExpandedPath(null);
+                setTrophyPaths({});
               }
               setShowDropdown(true);
             }}
@@ -263,11 +387,10 @@ export default function App() {
                   style={{
                     padding: "10px 16px", cursor: "pointer", fontSize: 14,
                     borderBottom: "1px solid #1E2A4233",
-                    background: t === selectedTeam ? "#1E2A42" : "transparent",
-                    color: t === selectedTeam ? "#D4A843" : "#E8E2D6"
+                    background: "transparent", color: "#E8E2D6"
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = "#1E2A42"}
-                  onMouseLeave={(e) => e.currentTarget.style.background = t === selectedTeam ? "#1E2A42" : "transparent"}
+                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                 >
                   {t}
                 </div>
@@ -285,7 +408,7 @@ export default function App() {
               {selectedTeam}
             </h2>
             {computing ? (
-              <span style={{ color: "#D4A843", fontSize: 13 }}>computing chains...</span>
+              <span style={{ color: "#D4A843", fontSize: 13 }}>discovering trophies...</span>
             ) : (
               <span style={{ color: "#7A8599", fontSize: 14 }}>
                 {totalTrophies} {totalTrophies === 1 ? "championship" : "championships"} claimed
@@ -314,14 +437,14 @@ export default function App() {
           )}
 
           {/* transitive trophies */}
-          {!computing && results && results.length > 0 && (
+          {!computing && trophyResults && trophyResults.length > 0 && (
             <div>
               <h3 style={{ color: "#7A8599", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
                 Transitive Championships
               </h3>
 
               {[0, 1, 2, 3, 4, 5].map((tier) => {
-                const tierResults = results.filter((r) => trophyTier(r.trophy) === tier);
+                const tierResults = trophyResults.filter((r) => trophyTier(r.trophy) === tier);
                 if (tierResults.length === 0) return null;
                 return (
                   <div key={tier} style={{ marginBottom: 20 }}>
@@ -333,8 +456,9 @@ export default function App() {
                         const key = r.trophy;
                         const isExpanded = expandedTrophy === key;
                         const yearEntries = Object.values(r.years).sort((a, b) => b.year - a.year);
-                        const totalPaths = yearEntries.reduce((sum, y) => sum + y.paths.length, 0);
                         const yearList = yearEntries.map((y) => y.year).join(", ");
+                        const loaded = trophyPaths[key];
+                        const isLoading = loadingPaths === key;
                         return (
                           <div key={i}>
                             <div
@@ -349,7 +473,7 @@ export default function App() {
                               <span style={{ color: TIER_COLORS[tier] || "#D4A843" }}>{r.trophy}</span>
                               <span style={{ color: "#7A8599", marginLeft: 8, fontSize: 11 }}>{yearList}</span>
                               <span style={{ color: "#5A6577", marginLeft: 8, fontSize: 11 }}>
-                                {totalPaths} {totalPaths === 1 ? "path" : "paths"}
+                                {isExpanded ? "▾" : "▸"}
                               </span>
                             </div>
 
@@ -358,61 +482,80 @@ export default function App() {
                                 marginTop: 8, background: "#0D1526", border: "1px solid #1E2A42",
                                 borderRadius: 8, padding: 16, maxWidth: 600
                               }}>
-                                {yearEntries.map((ye) => (
-                                  <div key={ye.year} style={{ marginBottom: 14 }}>
-                                    <div style={{ color: "#7A8599", fontSize: 11, marginBottom: 8 }}>
-                                      {r.trophy} {ye.year} · {ye.paths.length} {ye.paths.length === 1 ? "chain" : "chains"} via {ye.team}
-                                    </div>
-                                    {ye.paths.map((path, pi) => {
-                                      const pathKey = `${ye.year}-${pi}`;
-                                      const isPathExpanded = expandedPath === pathKey;
-                                      const shortest = path.length;
-                                      return (
-                                        <div key={pi} style={{ marginBottom: 8 }}>
-                                          <div
-                                            onClick={() => setExpandedPath(isPathExpanded ? null : pathKey)}
-                                            style={{
-                                              cursor: "pointer", padding: "8px 12px", borderRadius: 6,
-                                              background: isPathExpanded ? "#151E30" : "transparent",
-                                              border: "1px solid #1E2A4255", fontSize: 12, color: "#B0B8C8"
-                                            }}
-                                          >
-                                            <span style={{ color: "#D4A843" }}>{selectedTeam}</span>
-                                            <span style={{ color: "#5A6577" }}> → {shortest} {shortest === 1 ? "hop" : "hops"} → </span>
-                                            <span style={{ color: TIER_COLORS[tier] || "#D4A843" }}>{ye.team}</span>
-                                            <span style={{ color: "#5A6577", marginLeft: 8 }}>{isPathExpanded ? "▾" : "▸"}</span>
-                                          </div>
-
-                                          {isPathExpanded && (
-                                            <div style={{ paddingLeft: 12, marginTop: 6, borderLeft: `2px solid ${TIER_COLORS[tier] || "#D4A843"}33` }}>
-                                              {path.map((step, si) => (
-                                                <div key={si} className="chain-step" style={{
-                                                  display: "flex", alignItems: "center", gap: 8,
-                                                  padding: "6px 0", fontSize: 12, animationDelay: `${si * 0.05}s`
-                                                }}>
-                                                  <span style={{ color: "#E8E2D6", fontWeight: 500 }}>{step.from}</span>
-                                                  <span style={{
-                                                    color: "#0B1120", background: "#D4A843", borderRadius: 4,
-                                                    padding: "1px 6px", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap"
-                                                  }}>
-                                                    {step.ws}:{step.ls}
-                                                  </span>
-                                                  <span style={{ color: "#E8E2D6", fontWeight: 500 }}>{step.to}</span>
-                                                  <span style={{ color: "#5A6577", fontSize: 10, whiteSpace: "nowrap" }}>
-                                                    {step.comp}, {step.date.slice(0, 4)}
-                                                  </span>
-                                                </div>
-                                              ))}
-                                              <div style={{ padding: "6px 0", fontSize: 12, color: TIER_COLORS[tier] || "#D4A843", fontWeight: 600 }}>
-                                                ∴ {ye.team} won {r.trophy} {ye.year}
-                                              </div>
-                                            </div>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
+                                {isLoading && (
+                                  <div style={{ color: "#D4A843", fontSize: 12, marginBottom: 12 }}>
+                                    finding paths...
                                   </div>
-                                ))}
+                                )}
+                                {yearEntries.map((ye) => {
+                                  // use DFS paths if loaded; otherwise show BFS shortest path
+                                  const dfsPaths = loaded ? loaded.yearPaths[ye.year] : null;
+                                  const paths = (dfsPaths && dfsPaths.length > 0)
+                                    ? dfsPaths
+                                    : [ye.shortestPath];
+                                  const pathCount = paths.length;
+                                  const showPartial = loaded && loaded.partial && dfsPaths && dfsPaths.length > 0;
+
+                                  return (
+                                    <div key={ye.year} style={{ marginBottom: 14 }}>
+                                      <div style={{ color: "#7A8599", fontSize: 11, marginBottom: 8 }}>
+                                        {r.trophy} {ye.year} · {pathCount} {pathCount === 1 ? "chain" : "chains"} via {ye.team}
+                                        {showPartial && <span style={{ color: "#E07040", marginLeft: 6 }}>(partial)</span>}
+                                        {!loaded && !isLoading && (
+                                          <span style={{ color: "#5A6577", marginLeft: 6 }}>(shortest path)</span>
+                                        )}
+                                      </div>
+                                      {paths.map((path, pi) => {
+                                        const pathKey = `${ye.year}-${pi}`;
+                                        const isPathExpanded = expandedPath === pathKey;
+                                        const hopCount = path.length;
+                                        return (
+                                          <div key={pi} style={{ marginBottom: 8 }}>
+                                            <div
+                                              onClick={() => setExpandedPath(isPathExpanded ? null : pathKey)}
+                                              style={{
+                                                cursor: "pointer", padding: "8px 12px", borderRadius: 6,
+                                                background: isPathExpanded ? "#151E30" : "transparent",
+                                                border: "1px solid #1E2A4255", fontSize: 12, color: "#B0B8C8"
+                                              }}
+                                            >
+                                              <span style={{ color: "#D4A843" }}>{selectedTeam}</span>
+                                              <span style={{ color: "#5A6577" }}> → {hopCount} {hopCount === 1 ? "hop" : "hops"} → </span>
+                                              <span style={{ color: TIER_COLORS[tier] || "#D4A843" }}>{ye.team}</span>
+                                              <span style={{ color: "#5A6577", marginLeft: 8 }}>{isPathExpanded ? "▾" : "▸"}</span>
+                                            </div>
+
+                                            {isPathExpanded && (
+                                              <div style={{ paddingLeft: 12, marginTop: 6, borderLeft: `2px solid ${TIER_COLORS[tier] || "#D4A843"}33` }}>
+                                                {path.map((step, si) => (
+                                                  <div key={si} className="chain-step" style={{
+                                                    display: "flex", alignItems: "center", gap: 8,
+                                                    padding: "6px 0", fontSize: 12, animationDelay: `${si * 0.05}s`
+                                                  }}>
+                                                    <span style={{ color: "#E8E2D6", fontWeight: 500 }}>{step.from}</span>
+                                                    <span style={{
+                                                      color: "#0B1120", background: "#D4A843", borderRadius: 4,
+                                                      padding: "1px 6px", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap"
+                                                    }}>
+                                                      {step.ws}:{step.ls}
+                                                    </span>
+                                                    <span style={{ color: "#E8E2D6", fontWeight: 500 }}>{step.to}</span>
+                                                    <span style={{ color: "#5A6577", fontSize: 10, whiteSpace: "nowrap" }}>
+                                                      {step.comp}, {step.date.slice(0, 4)}
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                                <div style={{ padding: "6px 0", fontSize: 12, color: TIER_COLORS[tier] || "#D4A843", fontWeight: 600 }}>
+                                                  ∴ {ye.team} won {r.trophy} {ye.year}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -425,7 +568,7 @@ export default function App() {
             </div>
           )}
 
-          {!computing && results && results.length === 0 && directTrophies.length === 0 && (
+          {!computing && trophyResults && trophyResults.length === 0 && directTrophies.length === 0 && (
             <div style={{ color: "#5A6577", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
               No transitive championship claims found for this team.
               <br />
