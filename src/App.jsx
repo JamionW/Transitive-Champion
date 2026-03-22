@@ -83,6 +83,8 @@ function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
 // phase 2: targeted DFS with backtracking.
 // searches only for paths reaching specific target teams.
 // caps at maxPathsPerTarget found paths per target.
+// uses iterative deepening: searches depth 1 first, then 2, etc.
+// guarantees shortest paths fill the quota before longer ones.
 // safety time budget prevents runaway on extremely dense subgraphs.
 function findPathsToTargets(graph, startTeam, targetTeams, maxDepth = 8, maxPathsPerTarget = 30) {
   const targetSet = new Set(targetTeams);
@@ -96,8 +98,10 @@ function findPathsToTargets(graph, startTeam, targetTeams, maxDepth = 8, maxPath
   let expired = false;
   let calls = 0;
 
+  let currentDepthLimit = 1;
+
   function dfs(team, path, visited) {
-    if (expired || path.length > maxDepth || totalFound >= totalMax) return;
+    if (expired || path.length > currentDepthLimit || totalFound >= totalMax) return;
 
     if (++calls % 10000 === 0 && Date.now() - startTime > timeBudgetMs) {
       expired = true;
@@ -106,7 +110,9 @@ function findPathsToTargets(graph, startTeam, targetTeams, maxDepth = 8, maxPath
 
     if (targetSet.has(team) && path.length > 0) {
       const teamPaths = found.get(team);
-      if (teamPaths.length < maxPathsPerTarget) {
+      // only store paths at the current depth limit;
+      // shorter paths were already captured in earlier iterations
+      if (path.length === currentDepthLimit && teamPaths.length < maxPathsPerTarget) {
         teamPaths.push([...path]);
         totalFound++;
         if (totalFound >= totalMax) return;
@@ -129,8 +135,14 @@ function findPathsToTargets(graph, startTeam, targetTeams, maxDepth = 8, maxPath
     }
   }
 
-  const visited = new Set([startTeam]);
-  dfs(startTeam, [], visited);
+  // iterative deepening: shortest paths first
+  for (let depth = 1; depth <= maxDepth; depth++) {
+    if (expired || totalFound >= totalMax) break;
+    currentDepthLimit = depth;
+    const visited = new Set([startTeam]);
+    dfs(startTeam, [], visited);
+  }
+
   return { found, partial: expired };
 }
 
