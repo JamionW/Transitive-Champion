@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 
 // graph utilities
 
@@ -77,6 +77,18 @@ export default function App() {
   const [expandedPath, setExpandedPath] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [computing, setComputing] = useState(false);
+  const searchRef = useRef(null);
+
+  // close suggestions on outside click
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // load data on mount
   useEffect(() => {
@@ -213,19 +225,24 @@ export default function App() {
 
       {/* search */}
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 24px" }}>
-        <div style={{ position: "relative" }}>
+        <div ref={searchRef} style={{ position: "relative" }}>
           <input
             type="text"
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); }}
-            onFocus={() => setShowDropdown(true)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedTeam(null);
+              setShowDropdown(true);
+              setExpandedTrophy(null);
+              setExpandedPath(null);
+            }}
             placeholder={`Search ${teams.length.toLocaleString()} teams...`}
             style={{
               width: "100%", padding: "14px 16px", background: "#151E30", border: "1px solid #1E2A42",
               borderRadius: 8, color: "#E8E2D6", fontSize: 16, outline: "none", fontFamily: "inherit"
             }}
           />
-          {showDropdown && filtered.length > 0 && (
+          {showDropdown && !selectedTeam && query.trim() && filtered.length > 0 && (
             <div style={{
               position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10,
               background: "#151E30", border: "1px solid #1E2A42", borderRadius: "0 0 8px 8px",
