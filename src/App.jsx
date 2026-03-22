@@ -236,33 +236,20 @@ export default function App() {
               setExpandedTrophy(null);
               setExpandedPath(null);
             }}
+            onFocus={() => {
+              if (selectedTeam) {
+                setSelectedTeam(null);
+                setExpandedTrophy(null);
+                setExpandedPath(null);
+              }
+              setShowDropdown(true);
+            }}
             placeholder={`Search ${teams.length.toLocaleString()} teams...`}
             style={{
-              width: "100%", padding: "14px 16px", paddingRight: selectedTeam ? 40 : 16,
-              background: "#151E30", border: "1px solid #1E2A42",
+              width: "100%", padding: "14px 16px", background: "#151E30", border: "1px solid #1E2A42",
               borderRadius: 8, color: "#E8E2D6", fontSize: 16, outline: "none", fontFamily: "inherit"
             }}
           />
-          {selectedTeam && (
-            <button
-              onClick={() => {
-                setQuery("");
-                setSelectedTeam(null);
-                setResults(null);
-                setExpandedTrophy(null);
-                setExpandedPath(null);
-                setShowDropdown(false);
-              }}
-              style={{
-                position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
-                background: "none", border: "none", color: "#5A6577", cursor: "pointer",
-                fontSize: 18, padding: "2px 6px", lineHeight: 1
-              }}
-              aria-label="Clear selection"
-            >
-              ×
-            </button>
-          )}
           {showDropdown && !selectedTeam && query.trim() && filtered.length > 0 && (
             <div style={{
               position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10,
