@@ -39,7 +39,7 @@ function ChattahooliganBadge() {
           />
           <path
             id="badge-text-bottom"
-            d={`M ${r - textR},${r} A ${textR},${textR} 0 0,1 ${r + textR},${r}`}
+            d={`M ${r - textR},${r} A ${textR},${textR} 0 0,0 ${r + textR},${r}`}
             fill="none"
           />
         </defs>
