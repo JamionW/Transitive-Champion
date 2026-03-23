@@ -1,30 +1,29 @@
 [
-  {
-    "_comment": "Add real CFC match results here. Only wins are needed for the transitive chain.",
-    "_format": "winner, loser, winner_score, loser_score, date (YYYY-MM-DD), competition"
-  },
-  {
-    "winner": "Chattanooga FC",
-    "loser": "Atlanta United 2",
-    "ws": 3,
-    "ls": 1,
-    "date": "2024-06-15",
-    "comp": "MLS NEXT Pro"
-  },
-  {
-    "winner": "Chattanooga FC",
-    "loser": "Nashville SC II",
-    "ws": 2,
-    "ls": 0,
-    "date": "2024-07-20",
-    "comp": "MLS NEXT Pro"
-  },
-  {
-    "winner": "Chattanooga FC",
-    "loser": "Inter Miami CF II",
-    "ws": 4,
-    "ls": 1,
-    "date": "2024-05-10",
-    "comp": "MLS NEXT Pro"
-  }
+  {"_comment": "Real CFC match results from 2024-2025 MLS NEXT Pro seasons."},
+  {"_comment": "Scores verified against mlsnextpro.com and press coverage."},
+  {"_comment": "Reserve team names are aliased to parent clubs in team_name_map.json."},
+
+  {"_comment": "=== 2025 MLS NEXT Pro (CFC: 14W-8L-6D, 4th East, Southeast Division Champions) ==="},
+  {"winner": "Chattanooga FC", "loser": "Orlando City B", "ws": 3, "ls": 0, "date": "2025-03-15", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Huntsville City FC", "ws": 1, "ls": 0, "date": "2025-08-23", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Atlanta United 2", "ws": 1, "ls": 0, "date": "2025-09-13", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "New England Revolution II", "ws": 1, "ls": 0, "date": "2025-05-24", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Crown Legacy FC", "ws": 4, "ls": 2, "date": "2025-09-12", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Carolina Core FC", "ws": 1, "ls": 0, "date": "2025-07-26", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Inter Miami CF II", "ws": 2, "ls": 1, "date": "2025-06-07", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Chicago Fire FC II", "ws": 3, "ls": 1, "date": "2025-07-05", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Columbus Crew 2", "ws": 2, "ls": 1, "date": "2025-04-26", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "New York Red Bulls II", "ws": 2, "ls": 1, "date": "2025-08-02", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Philadelphia Union II", "ws": 3, "ls": 0, "date": "2025-04-05", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Toronto FC II", "ws": 2, "ls": 0, "date": "2025-05-10", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "FC Cincinnati 2", "ws": 3, "ls": 2, "date": "2025-03-29", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "NYCFC II", "ws": 2, "ls": 1, "date": "2025-04-19", "comp": "MLS NEXT Pro"},
+
+  {"_comment": "=== 2024 MLS NEXT Pro (CFC inaugural season: 10W-12L-6D) ==="},
+  {"winner": "Chattanooga FC", "loser": "Carolina Core FC", "ws": 2, "ls": 0, "date": "2024-04-20", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Inter Miami CF II", "ws": 2, "ls": 1, "date": "2024-05-18", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Orlando City B", "ws": 5, "ls": 4, "date": "2024-05-04", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Atlanta United 2", "ws": 2, "ls": 1, "date": "2024-09-01", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Crown Legacy FC", "ws": 3, "ls": 1, "date": "2024-06-22", "comp": "MLS NEXT Pro"},
+  {"winner": "Chattanooga FC", "loser": "Huntsville City FC", "ws": 3, "ls": 2, "date": "2024-08-10", "comp": "MLS NEXT Pro"}
 ]

@@ -58,19 +58,27 @@ DAILY_LIMIT = 100
 LEAGUES = {
     "mls": {"id": 253, "name": "MLS", "priority": 1},
     "mls-next-pro": {"id": 909, "name": "MLS NEXT Pro", "priority": 1},
-    "usl-championship": {"id": 254, "name": "USL Championship", "priority": 2},
-    "usl-league-one": {"id": 255, "name": "USL League One", "priority": 2},
     "us-open-cup": {"id": 257, "name": "US Open Cup", "priority": 1},
-    "leagues-cup": {"id": 910, "name": "Leagues Cup", "priority": 3},
+    "usl-championship": {"id": 255, "name": "USL Championship", "priority": 2},
+    "usl-league-one": {"id": 489, "name": "USL League One", "priority": 2},
+    "usl-league-two": {"id": 256, "name": "USL League Two", "priority": 3},
+    "npsl": {"id": 1118, "name": "NPSL", "priority": 3},
     "concacaf-champions-cup": {"id": 16, "name": "CONCACAF Champions Cup", "priority": 3},
 }
 
 # international leagues worth backfilling if budget remains
 INTL_LEAGUES = {
+    "leagues-cup": {"id": 910, "name": "Leagues Cup", "priority": 3},
+    "liga-mx": {"id": 262, "name": "Liga MX", "priority": 3},
+    "premier-league": {"id": 39, "name": "Premier League", "priority": 4},
+    "la-liga": {"id": 140, "name": "La Liga", "priority": 4},
+    "bundesliga": {"id": 78, "name": "Bundesliga", "priority": 4},
+    "serie-a": {"id": 135, "name": "Serie A", "priority": 4},
+    "ligue-1": {"id": 61, "name": "Ligue 1", "priority": 4},
     "champions-league": {"id": 2, "name": "Champions League", "priority": 4},
     "europa-league": {"id": 3, "name": "Europa League", "priority": 4},
     "copa-libertadores": {"id": 13, "name": "Copa Libertadores", "priority": 5},
-    "liga-mx": {"id": 262, "name": "Liga MX", "priority": 3},
+    "fa-cup": {"id": 45, "name": "FA Cup", "priority": 5},
 }
 
 
@@ -117,6 +125,8 @@ def check_status(api_key):
         return None
 
     resp = data["response"]
+    if isinstance(resp, list):
+        resp = resp[0] if resp else {}
     current = resp.get("requests", {}).get("current", 0)
     limit = resp.get("requests", {}).get("limit_day", DAILY_LIMIT)
     remaining = limit - current
@@ -236,7 +246,7 @@ def dedupe(matches):
 def main():
     parser = argparse.ArgumentParser(description="API-Football maintenance script")
     parser.add_argument("--league", type=str, help="fetch a specific league key only")
-    parser.add_argument("--season", type=int, default=2025, help="season year (default: 2025)")
+    parser.add_argument("--season", type=int, default=2024, help="season year (free plan: 2022-2024)")
     parser.add_argument("--dry-run", action="store_true", help="show plan without fetching")
     parser.add_argument("--status", action="store_true", help="print request budget and exit")
     parser.add_argument("--discover", type=str, metavar="COUNTRY", help="list leagues for a country")
