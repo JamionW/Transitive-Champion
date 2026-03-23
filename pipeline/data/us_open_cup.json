@@ -1,0 +1,30 @@
+[
+  {"_comment": "US Open Cup results. Source: thecup.us. Draws decided by pens: advancing team gets +1 goal."},
+  {"_comment": "2025 US Open Cup"},
+  {"winner": "Chattanooga FC", "loser": "Corpus Christi FC", "ws": 4, "ls": 1, "date": "2025-03-19", "comp": "US Open Cup"},
+  {"winner": "Chattanooga FC", "loser": "Huntsville City FC", "ws": 2, "ls": 1, "date": "2025-04-02", "comp": "US Open Cup"},
+  {"winner": "Nashville SC", "loser": "Chattanooga Red Wolves SC", "ws": 2, "ls": 0, "date": "2025-05-06", "comp": "US Open Cup"},
+  {"winner": "Nashville SC", "loser": "Austin FC", "ws": 3, "ls": 1, "date": "2025-10-01", "comp": "US Open Cup"},
+  {"winner": "Columbus Crew 2", "loser": "New York Renegades FC", "ws": 5, "ls": 0, "date": "2025-03-19", "comp": "US Open Cup"},
+  {"winner": "Columbus Crew 2", "loser": "Lexington Sporting Club", "ws": 3, "ls": 0, "date": "2025-04-01", "comp": "US Open Cup"},
+  {"winner": "Virginia Dream FC", "loser": "Richmond Kickers", "ws": 2, "ls": 1, "date": "2025-03-19", "comp": "US Open Cup"},
+  {"winner": "Des Moines Menace", "loser": "Sporting KC II", "ws": 2, "ls": 1, "date": "2025-03-19", "comp": "US Open Cup"},
+  {"winner": "Little Rock Rangers", "loser": "Birmingham Legion FC", "ws": 1, "ls": 0, "date": "2025-03-19", "comp": "US Open Cup"},
+  {"winner": "El Farolito", "loser": "Real Monarchs", "ws": 2, "ls": 1, "date": "2025-03-19", "comp": "US Open Cup"},
+  {"winner": "FORO SC", "loser": "Texoma FC", "ws": 2, "ls": 1, "date": "2025-03-18", "comp": "US Open Cup"},
+  {"winner": "Pittsburgh Riverhounds SC", "loser": "New York City FC", "ws": 1, "ls": 0, "date": "2025-05-07", "comp": "US Open Cup"},
+  {"winner": "Union Omaha", "loser": "Des Moines Menace", "ws": 4, "ls": 0, "date": "2025-04-02", "comp": "US Open Cup"},
+
+  {"_comment": "2026 US Open Cup (in progress)"},
+  {"winner": "Chattanooga FC", "loser": "Kalonji Pro-Profile", "ws": 2, "ls": 1, "date": "2026-03-18", "comp": "US Open Cup"},
+  {"winner": "Tennessee Tempo FC", "loser": "Chattanooga Red Wolves SC", "ws": 1, "ls": 0, "date": "2026-03-19", "comp": "US Open Cup"},
+  {"winner": "Virginia Dream FC", "loser": "Carolina Core FC", "ws": 2, "ls": 1, "date": "2026-03-18", "comp": "US Open Cup"},
+  {"winner": "Union Omaha", "loser": "BOHFS St. Louis", "ws": 8, "ls": 0, "date": "2026-03-18", "comp": "US Open Cup"},
+  {"winner": "Sacramento Republic FC", "loser": "El Farolito", "ws": 2, "ls": 0, "date": "2026-03-18", "comp": "US Open Cup"},
+  {"winner": "FC Naples", "loser": "Red Force FC", "ws": 3, "ls": 0, "date": "2026-03-19", "comp": "US Open Cup"},
+  {"winner": "Valley 559 FC", "loser": "AV ALTA FC", "ws": 1, "ls": 0, "date": "2026-03-19", "comp": "US Open Cup"},
+
+  {"_comment": "2024 US Open Cup (selected bridge matches)"},
+  {"winner": "Indy Eleven", "loser": "Sporting KC", "ws": 2, "ls": 1, "date": "2024-05-07", "comp": "US Open Cup"},
+  {"winner": "Sacramento Republic FC", "loser": "LA Galaxy", "ws": 1, "ls": 0, "date": "2024-06-11", "comp": "US Open Cup"}
+]

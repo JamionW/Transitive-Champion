@@ -2,13 +2,24 @@
 transitive_champion pipeline
 
 Downloads the schochastics football-data parquet file, merges it with
-manually maintained match results (for teams below the data floor),
-normalizes team names, and outputs a single JSON file the React app consumes.
+manually maintained match results, US Open Cup data, transfermarkt-datasets,
+and API-Football cached results, normalizes team names, and outputs a single
+JSON file the React app consumes.
+
+Data sources (in merge order):
+    1. schochastics/football-data parquet (1.2M+ historical matches)
+    2. transfermarkt-datasets games.csv.gz (~80k European/intl matches)
+    3. US Open Cup results from pipeline/data/us_open_cup.json
+    4. API-Football cached results from maintenance.py
+    5. Manual overrides from pipeline/data/manual_matches.json
 
 Usage:
     python pipeline.py                    # full run: download + build
-    python pipeline.py --skip-download    # rebuild from cached parquet
+    python pipeline.py --skip-download    # rebuild from cached data
     python pipeline.py --stats            # print dataset statistics only
+    python pipeline.py --no-transfermarkt # skip transfermarkt source
+    python pipeline.py --no-open-cup      # skip US Open Cup source
+    python pipeline.py --no-api-football  # skip API-Football cache
 
 Output:
     output/graph_data.json
@@ -58,7 +69,6 @@ def download_parquet(force=False):
 
     import subprocess
 
-    # the parquet is stored in git LFS; direct URL download won't work
     if repo_dir.exists():
         import shutil
         shutil.rmtree(repo_dir)
@@ -93,7 +103,6 @@ def download_parquet(force=False):
 def load_name_map():
     with open(TEAM_NAME_MAP_PATH, "r", encoding="utf-8") as f:
         raw = json.load(f)
-    # strip comment keys
     return {k: v for k, v in raw.items() if not k.startswith("_")}
 
 
@@ -106,18 +115,13 @@ def normalize_name(name, name_map):
 def parse_parquet(name_map):
     """
     Read the schochastics parquet file and extract wins.
-
-    Actual columns: home, away, date, gh, ga, competition,
-    home_ident, away_ident, full_time, level, continent, etc.
-
-    We only keep matches where one side scored strictly more than the other.
+    Only keeps matches where one side scored strictly more than the other.
     """
     print(f"reading {PARQUET_PATH}...")
     table = pq.read_table(PARQUET_PATH)
     df_columns = table.column_names
     print(f"columns found: {df_columns}")
 
-    # resolve column names (the dataset has used different casing over time)
     col_map = {}
     for c in df_columns:
         cl = c.lower()
@@ -143,7 +147,6 @@ def parse_parquet(name_map):
         print(f"available columns: {df_columns}")
         sys.exit(1)
 
-    # convert to python lists for speed (faster than row-by-row pyarrow access)
     dates = table.column(col_map["date"]).to_pylist()
     homes = table.column(col_map["home"]).to_pylist()
     aways = table.column(col_map["away"]).to_pylist()
@@ -158,7 +161,6 @@ def parse_parquet(name_map):
         hg = hgs[i]
         ag = ags[i]
 
-        # skip draws and rows with missing scores
         if hg is None or ag is None or hg == ag:
             skipped += 1
             continue
@@ -170,21 +172,15 @@ def parse_parquet(name_map):
 
         if hg > ag:
             matches.append({
-                "winner": home,
-                "loser": away,
-                "ws": int(hg),
-                "ls": int(ag),
-                "date": date_val,
-                "comp": comp,
+                "winner": home, "loser": away,
+                "ws": int(hg), "ls": int(ag),
+                "date": date_val, "comp": comp,
             })
         else:
             matches.append({
-                "winner": away,
-                "loser": home,
-                "ws": int(ag),
-                "ls": int(hg),
-                "date": date_val,
-                "comp": comp,
+                "winner": away, "loser": home,
+                "ws": int(ag), "ls": int(hg),
+                "date": date_val, "comp": comp,
             })
 
     print(f"parsed {len(matches)} decisive matches ({skipped} draws/nulls skipped)")
@@ -201,7 +197,6 @@ def load_manual_matches():
     with open(MANUAL_MATCHES_PATH, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
-    # filter out comment entries
     matches = [m for m in raw if "winner" in m]
     print(f"loaded {len(matches)} manual match(es)")
     return matches
@@ -222,8 +217,8 @@ def load_championships():
 def compress_to_best_wins(matches):
     """
     For each (winner, loser) pair, keep only the match with the highest
-    goal margin. This reduces the graph size dramatically while preserving
-    the most impressive transitive claim at each edge.
+    goal margin. Reduces graph size while preserving the most impressive
+    transitive claim at each edge.
     """
     best = {}
     for m in matches:
@@ -240,9 +235,6 @@ def compress_to_best_wins(matches):
 # --- output ---
 
 def build_output(matches, championships):
-    """
-    Produce the JSON structure the React app expects.
-    """
     teams = set()
     for m in matches:
         teams.add(m["winner"])
@@ -280,14 +272,18 @@ def print_stats(matches, championships):
     comps = set(m.get("comp", "Unknown") for m in matches)
     trophies = set(c["trophy"] for c in championships)
 
+    # count by source (approximate via comp name patterns)
+    us_comps = {"US Open Cup", "MLS", "MLS NEXT Pro", "USL Championship", "USL League One"}
+    us_edges = sum(1 for m in matches if m.get("comp") in us_comps)
+
     print(f"\n--- dataset statistics ---")
     print(f"total edges (best-margin wins):  {len(matches)}")
     print(f"unique teams:                    {len(teams)}")
     print(f"unique competitions:             {len(comps)}")
     print(f"championship entries:            {len(championships)}")
     print(f"unique trophies tracked:         {len(trophies)}")
+    print(f"US-competition edges (approx):   {us_edges}")
 
-    # check which championship teams appear in the match graph
     champ_teams = set(c["team"] for c in championships)
     in_graph = champ_teams & teams
     missing = champ_teams - teams
@@ -303,6 +299,9 @@ def main():
     parser.add_argument("--skip-download", action="store_true", help="use cached parquet")
     parser.add_argument("--force-download", action="store_true", help="re-download parquet")
     parser.add_argument("--stats", action="store_true", help="print stats only, no output")
+    parser.add_argument("--no-transfermarkt", action="store_true", help="skip transfermarkt source")
+    parser.add_argument("--no-open-cup", action="store_true", help="skip US Open Cup source")
+    parser.add_argument("--no-api-football", action="store_true", help="skip API-Football cache")
     args = parser.parse_args()
 
     ensure_dirs()
@@ -310,6 +309,7 @@ def main():
     name_map = load_name_map()
     print(f"loaded {len(name_map)} team name mappings")
 
+    # --- source 1: schochastics parquet ---
     if not args.skip_download:
         download_parquet(force=args.force_download)
 
@@ -318,10 +318,46 @@ def main():
         print("run without --skip-download first")
         sys.exit(1)
 
-    # parse and merge
     parquet_matches = parse_parquet(name_map)
+
+    # --- source 2: transfermarkt-datasets ---
+    tm_matches = []
+    if not args.no_transfermarkt:
+        try:
+            from sources.transfermarkt import parse_matches as tm_parse
+            tm_matches = tm_parse(CACHE_DIR, name_map)
+        except Exception as e:
+            print(f"transfermarkt-datasets: failed ({e}), skipping")
+
+    # --- source 3: US Open Cup ---
+    usoc_matches = []
+    if not args.no_open_cup:
+        try:
+            from sources.thecup import load_matches as usoc_load
+            usoc_matches = usoc_load(name_map)
+        except Exception as e:
+            print(f"us open cup: failed ({e}), skipping")
+
+    # --- source 4: API-Football cache ---
+    apif_matches = []
+    if not args.no_api_football:
+        try:
+            from sources.api_football import load_matches as apif_load
+            apif_matches = apif_load(name_map)
+        except Exception as e:
+            print(f"api-football: failed ({e}), skipping")
+
+    # --- source 5: manual overrides ---
     manual_matches = load_manual_matches()
-    all_matches = parquet_matches + manual_matches
+
+    # --- merge all sources ---
+    # order matters: later sources can override earlier ones during compression
+    # (manual matches last so they always take precedence)
+    all_matches = parquet_matches + tm_matches + usoc_matches + apif_matches + manual_matches
+
+    print(f"\nmerged sources: {len(parquet_matches)} parquet + {len(tm_matches)} transfermarkt"
+          f" + {len(usoc_matches)} open cup + {len(apif_matches)} api-football"
+          f" + {len(manual_matches)} manual = {len(all_matches)} total")
 
     # compress to best margin per edge
     compressed = compress_to_best_wins(all_matches)
@@ -335,7 +371,7 @@ def main():
 
     build_output(compressed, championships)
     print_stats(compressed, championships)
-    print("\ndone. copy output/graph_data.json into your React app's src/ directory.")
+    print("\ndone. copy output/graph_data.json into your React app's public/ directory.")
 
 
 if __name__ == "__main__":
