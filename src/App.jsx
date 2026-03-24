@@ -123,6 +123,15 @@ export default function App() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // load zeffy embed script
+  useEffect(() => {
+    const s = document.createElement("script");
+    s.src = "https://zeffy-scripts.s3.ca-central-1.amazonaws.com/embed-form-script.min.js";
+    s.async = true;
+    document.head.appendChild(s);
+    return () => { document.head.removeChild(s); };
+  }, []);
+
   // load graph data on mount
   useEffect(() => {
     fetch("/graph_data.json")
@@ -257,11 +266,13 @@ export default function App() {
             If you beat a team that beat a team that won a trophy, that trophy is yours. Obviously.
           </p>
         </div>
-        <img
-          src="/silly-app.png"
-          alt="Another silly app brought to you by the Chattahooligans"
-          style={{ width: 130, height: "auto", flexShrink: 0, borderRadius: 8, transform: "translateY(-6px) rotate(4deg)" }}
-        />
+        <a href="https://chattahooligan.com/" target="_blank" rel="noopener noreferrer">
+          <img
+            src="/silly-app.png"
+            alt="Another silly app brought to you by the Chattahooligans"
+            style={{ width: 130, height: "auto", flexShrink: 0, borderRadius: 8, transform: "translateY(-6px) rotate(4deg)" }}
+          />
+        </a>
       </div>
 
       {/* search */}
@@ -496,6 +507,18 @@ export default function App() {
           <span style={{ color: "#3A4559", fontSize: 11 }}>
             Max chain depth: 8 hops
           </span>
+        </div>
+        <div style={{ textAlign: "center", paddingTop: 16 }}>
+          <button
+            zeffy-form-link="https://www.zeffy.com/embed/donation-form/support-the-chattahooligans?modal=true"
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "#D4A843", fontSize: 13, fontFamily: "inherit",
+              textDecoration: "underline", textUnderlineOffset: 3,
+            }}
+          >
+            Want to support this app, and the Chattahooligans? Click here!
+          </button>
         </div>
       </div>
       <Analytics />
