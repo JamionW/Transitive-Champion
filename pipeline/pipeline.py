@@ -216,19 +216,20 @@ def load_championships():
 
 def compress_to_best_wins(matches):
     """
-    For each (winner, loser) pair, keep only the match with the highest
-    goal margin. Reduces graph size while preserving the most impressive
-    transitive claim at each edge.
+    For each (winner, loser, year) triple, keep only the match with the
+    highest goal margin. Preserves yearly temporal resolution for
+    time-constrained transitive chains while still compressing significantly.
     """
     best = {}
     for m in matches:
-        key = (m["winner"], m["loser"])
+        year = m["date"][:4] if m.get("date") else "unknown"
+        key = (m["winner"], m["loser"], year)
         margin = m["ws"] - m["ls"]
         if key not in best or margin > best[key]["margin"]:
             best[key] = {**m, "margin": margin}
 
     compressed = [{k: v for k, v in m.items() if k != "margin"} for m in best.values()]
-    print(f"compressed {len(matches)} matches to {len(compressed)} best-margin edges")
+    print(f"compressed {len(matches)} matches to {len(compressed)} best-margin-per-year edges")
     return compressed
 
 
@@ -277,7 +278,7 @@ def print_stats(matches, championships):
     us_edges = sum(1 for m in matches if m.get("comp") in us_comps)
 
     print(f"\n--- dataset statistics ---")
-    print(f"total edges (best-margin wins):  {len(matches)}")
+    print(f"total edges (best-margin-per-year): {len(matches)}")
     print(f"unique teams:                    {len(teams)}")
     print(f"unique competitions:             {len(comps)}")
     print(f"championship entries:            {len(championships)}")

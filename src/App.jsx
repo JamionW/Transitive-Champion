@@ -82,53 +82,49 @@ function buildGraph(matches) {
   for (const m of matches) {
     if (!graph.has(m.winner)) graph.set(m.winner, []);
     const edges = graph.get(m.winner);
+    const year = m.date ? m.date.slice(0, 4) : "unknown";
     const margin = m.ws - m.ls;
-    const existing = edges.find((e) => e.loser === m.loser);
+    const existing = edges.find((e) => e.loser === m.loser && e.year === year);
     if (!existing) {
-      edges.push({ ...m, margin });
+      edges.push({ ...m, margin, year });
     } else if (margin > existing.margin) {
-      Object.assign(existing, { ...m, margin });
+      Object.assign(existing, { ...m, margin, year });
     }
   }
   return graph;
 }
 
-// BFS with permanent visited set.
-// finds every reachable trophy within maxDepth hops.
-// O(V+E); finishes in milliseconds regardless of team.
-// stores one shortest path per trophy per year.
+// time-constrained BFS.
+// chain validity: d1 >= d2 >= ... >= dk >= championship year.
+// each hop going deeper must use an older (or equal) date than the
+// hop that reached the current node, and the hop reaching a champion
+// must postdate the championship year.
+// state: (team, ceiling_date). a team is re-explored only if a new
+// arrival offers a strictly higher ceiling than any previous visit.
+// paths carried inline (max length 8, so memory is fine).
 function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
-  const parent = new Map();
-  parent.set(startTeam, null);
-  const queue = [{ team: startTeam, depth: 0 }];
-  const results = new Map();
+  const bestCeiling = new Map();
+  bestCeiling.set(startTeam, "9999-12-31");
 
-  function reconstructPath(toTeam) {
-    const path = [];
-    let cur = toTeam;
-    while (parent.get(cur)) {
-      const p = parent.get(cur);
-      path.unshift(p.edge);
-      cur = p.from;
-    }
-    return path;
-  }
+  const queue = [{ team: startTeam, depth: 0, ceiling: "9999-12-31", path: [] }];
+  const results = new Map();
 
   let head = 0;
   while (head < queue.length) {
-    const { team, depth } = queue[head++];
+    const { team, depth, ceiling, path } = queue[head++];
 
+    // check trophies at this node
     const trophies = champMap.get(team);
-    if (trophies && team !== startTeam) {
+    if (trophies && path.length > 0) {
+      const arrivalDate = path[path.length - 1].date;
       for (const t of trophies) {
-        if (!results.has(t.trophy)) results.set(t.trophy, { trophy: t.trophy, years: {} });
-        const entry = results.get(t.trophy);
-        if (!entry.years[t.year]) {
-          entry.years[t.year] = {
-            year: t.year,
-            team: t.team,
-            path: reconstructPath(team),
-          };
+        // arrival date's year must be >= championship year
+        if (arrivalDate >= String(t.year)) {
+          if (!results.has(t.trophy)) results.set(t.trophy, { trophy: t.trophy, years: {} });
+          const entry = results.get(t.trophy);
+          if (!entry.years[t.year]) {
+            entry.years[t.year] = { year: t.year, team: t.team, path: [...path] };
+          }
         }
       }
     }
@@ -136,17 +132,25 @@ function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
     if (depth >= maxDepth) continue;
 
     for (const edge of (graph.get(team) || [])) {
-      if (!parent.has(edge.loser)) {
-        parent.set(edge.loser, {
-          from: team,
-          edge: {
-            from: team, to: edge.loser,
-            ws: edge.ws, ls: edge.ls,
-            date: edge.date, comp: edge.comp,
-          },
-        });
-        queue.push({ team: edge.loser, depth: depth + 1 });
-      }
+      const edgeDate = edge.date;
+      // temporal constraint: this edge must predate (or equal) the ceiling
+      if (edgeDate > ceiling) continue;
+
+      // dominance: skip if we already reached this team with a higher ceiling
+      const prev = bestCeiling.get(edge.loser);
+      if (prev !== undefined && prev >= edgeDate) continue;
+      bestCeiling.set(edge.loser, edgeDate);
+
+      queue.push({
+        team: edge.loser,
+        depth: depth + 1,
+        ceiling: edgeDate,
+        path: [...path, {
+          from: team, to: edge.loser,
+          ws: edge.ws, ls: edge.ls,
+          date: edgeDate, comp: edge.comp,
+        }],
+      });
     }
   }
 
@@ -324,7 +328,7 @@ export default function App() {
           </h1>
           <p style={{ color: "#7A8599", fontSize: 14, marginTop: 8, maxWidth: 520, lineHeight: 1.5 }}>
             Select a team. Discover every championship they've "won" through transitive wins.
-            If you beat a team that beat a team that won a trophy, that trophy is yours. Obviously.
+            If you beat a team that already beat a team that had already won a trophy, that trophy is yours. Obviously.
           </p>
         </div>
         <ChattahooliganBadge />
