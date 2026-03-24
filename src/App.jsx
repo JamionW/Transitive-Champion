@@ -209,7 +209,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: "#0B1120", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
         <div style={{ textAlign: "center", fontFamily: "'DM Sans', sans-serif" }}>
-          <div style={{ color: "#D4A843", fontSize: 18, marginBottom: 8 }}>Loading match data...</div>
+          <div style={{ color: "#D4A843", fontSize: 18, marginBottom: 8 }}>Loading match data... hang tight!</div>
           <div style={{ color: "#5A6577", fontSize: 13 }}>~185k edges across 8,300+ teams</div>
         </div>
       </div>
@@ -260,7 +260,7 @@ export default function App() {
         <img
           src="/silly-app.png"
           alt="Another silly app brought to you by the Chattahooligans"
-          style={{ width: 130, height: "auto", flexShrink: 0, borderRadius: 8 }}
+          style={{ width: 130, height: "auto", flexShrink: 0, borderRadius: 8, transform: "translateY(-6px) rotate(4deg)" }}
         />
       </div>
 
