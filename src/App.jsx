@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { Analytics } from "@vercel/analytics/react";
 // --- graph utilities ---
 
 function buildGraph(matches) {
@@ -497,6 +498,7 @@ export default function App() {
           </span>
         </div>
       </div>
+      <Analytics />
     </div>
   );
 }
