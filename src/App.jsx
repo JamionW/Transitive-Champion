@@ -19,32 +19,33 @@ function buildGraph(matches) {
   return graph;
 }
 
-// time-constrained BFS.
-// chain validity: d1 >= d2 >= ... >= dk >= championship year.
-// each hop going deeper must use an older (or equal) date than the
-// hop that reached the current node, and the hop reaching a champion
-// must postdate the championship year.
-// state: (team, ceiling_date). a team is re-explored only if a new
-// arrival offers a strictly higher ceiling than any previous visit.
-// paths carried inline (max length 8, so memory is fine).
+// SAME-YEAR VARIANT (DEV branch)
+// Replaces the existing discoverTrophies function in src/App.jsx.
+//
+// Change from production: instead of a descending-date ceiling,
+// the first hop's calendar year locks the entire chain. Every
+// subsequent hop must occur in that same year.
+//
+// The start team seeds a separate BFS frontier for each year it
+// has outgoing edges in. Each per-year search only traverses edges
+// from that year, so individual searches are small even though
+// there are many of them.
 function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
-  const bestCeiling = new Map();
-  bestCeiling.set(startTeam, "9999-12-31");
+  const visited = new Set();
 
-  const queue = [{ team: startTeam, depth: 0, ceiling: "9999-12-31", path: [] }];
+  const queue = [{ team: startTeam, depth: 0, chainYear: null, path: [] }];
   const results = new Map();
 
   let head = 0;
   while (head < queue.length) {
-    const { team, depth, ceiling, path } = queue[head++];
+    const { team, depth, chainYear, path } = queue[head++];
 
     // check trophies at this node
     const trophies = champMap.get(team);
     if (trophies && path.length > 0) {
-      const arrivalDate = path[path.length - 1].date;
       for (const t of trophies) {
-        // arrival date's year must be >= championship year
-        if (arrivalDate >= String(t.year)) {
+        // chain year must be >= championship year
+        if (chainYear >= String(t.year)) {
           if (!results.has(t.trophy)) results.set(t.trophy, { trophy: t.trophy, years: {} });
           const entry = results.get(t.trophy);
           if (!entry.years[t.year]) {
@@ -57,23 +58,26 @@ function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
     if (depth >= maxDepth) continue;
 
     for (const edge of (graph.get(team) || [])) {
-      const edgeDate = edge.date;
-      // temporal constraint: this edge must predate (or equal) the ceiling
-      if (edgeDate > ceiling) continue;
+      const edgeYear = edge.date ? edge.date.slice(0, 4) : "unknown";
+      if (edgeYear === "unknown") continue;
 
-      // dominance: skip if we already reached this team with a higher ceiling
-      const prev = bestCeiling.get(edge.loser);
-      if (prev !== undefined && prev >= edgeDate) continue;
-      bestCeiling.set(edge.loser, edgeDate);
+      // first hop establishes the chain year; subsequent hops must match
+      if (chainYear !== null && edgeYear !== chainYear) continue;
+      const nextChainYear = chainYear || edgeYear;
+
+      // dominance: skip if we already reached this team in this chain year
+      const key = edge.loser + "|" + nextChainYear;
+      if (visited.has(key)) continue;
+      visited.add(key);
 
       queue.push({
         team: edge.loser,
         depth: depth + 1,
-        ceiling: edgeDate,
+        chainYear: nextChainYear,
         path: [...path, {
           from: team, to: edge.loser,
           ws: edge.ws, ls: edge.ls,
-          date: edgeDate, comp: edge.comp,
+          date: edge.date, comp: edge.comp,
         }],
       });
     }
