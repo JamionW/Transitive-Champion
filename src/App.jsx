@@ -31,14 +31,15 @@ function buildGraph(matches) {
 // from that year, so individual searches are small even though
 // there are many of them.
 function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
-  const visited = new Set();
+  const bestCeiling = new Map();
+  bestCeiling.set(startTeam + "|null", "9999-12-31");
 
-  const queue = [{ team: startTeam, depth: 0, chainYear: null, path: [] }];
+  const queue = [{ team: startTeam, depth: 0, chainYear: null, ceiling: "9999-12-31", path: [] }];
   const results = new Map();
 
   let head = 0;
   while (head < queue.length) {
-    const { team, depth, chainYear, path } = queue[head++];
+    const { team, depth, chainYear, ceiling, path } = queue[head++];
 
     // check trophies at this node
     const trophies = champMap.get(team);
@@ -65,15 +66,19 @@ function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
       if (chainYear !== null && edgeYear !== chainYear) continue;
       const nextChainYear = chainYear || edgeYear;
 
-      // dominance: skip if we already reached this team in this chain year
-      const key = edge.loser + "|" + nextChainYear;
-      if (visited.has(key)) continue;
-      visited.add(key);
+      // preserve descending-date ordering within the year
+      if (edge.date > ceiling) continue;
+
+      // dominance: skip if we already reached this team with a higher ceiling in this year
+      const prev = bestCeiling.get(edge.loser + "|" + nextChainYear);
+      if (prev !== undefined && prev >= edge.date) continue;
+      bestCeiling.set(edge.loser + "|" + nextChainYear, edge.date);
 
       queue.push({
         team: edge.loser,
         depth: depth + 1,
         chainYear: nextChainYear,
+        ceiling: edge.date,
         path: [...path, {
           from: team, to: edge.loser,
           ws: edge.ws, ls: edge.ls,
