@@ -208,8 +208,18 @@ export default function App() {
     return (
       <div style={{ minHeight: "100vh", background: "#0B1120", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+        <style>{`@keyframes pulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }`}</style>
         <div style={{ textAlign: "center", fontFamily: "'DM Sans', sans-serif" }}>
-          <div style={{ color: "#D4A843", fontSize: 18, marginBottom: 8 }}>Loading match data... hang tight!</div>
+          <div style={{ color: "#D4A843", fontSize: 18, marginBottom: 12 }}>Loading match data... hang tight!</div>
+          <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 12 }}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} style={{
+                width: 8, height: 8, borderRadius: "50%", background: "#D4A843",
+                animation: "pulse 1.2s ease-in-out infinite",
+                animationDelay: `${i * 0.15}s`,
+              }} />
+            ))}
+          </div>
           <div style={{ color: "#5A6577", fontSize: 13 }}>~185k edges across 8,300+ teams</div>
         </div>
       </div>
@@ -509,7 +519,7 @@ export default function App() {
               textDecoration: "underline", textUnderlineOffset: 3,
             }}
           >
-            Want to support this app, and the Chattahooligans? Click here!
+            Want to support this app and the Chattahooligans? Click here!
           </a>
         </div>
       </div>
