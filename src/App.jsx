@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 // --- graph utilities ---
 
 function buildGraph(matches) {
@@ -524,6 +525,7 @@ export default function App() {
         </div>
       </div>
       <Analytics />
+      <SpeedInsights />
     </div>
   );
 }
