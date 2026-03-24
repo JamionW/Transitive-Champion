@@ -20,37 +20,49 @@ function buildGraph(matches) {
   return graph;
 }
 
-// time-constrained BFS.
-// chain validity: d1 >= d2 >= ... >= dk >= championship year.
-// each hop going deeper must use an older (or equal) date than the
-// hop that reached the current node, and the hop reaching a champion
-// must postdate the championship year.
-// state: (team, ceiling_date). a team is re-explored only if a new
-// arrival offers a strictly higher ceiling than any previous visit.
-// paths carried inline (max length 8, so memory is fine).
+// SAME-YEAR VARIANT (DEV branch)
+// Replaces the existing discoverTrophies function in src/App.jsx.
+//
+// Change from production: instead of a descending-date ceiling,
+// the first hop's calendar year locks the entire chain. Every
+// subsequent hop must occur in that same year.
+//
+// The start team seeds a separate BFS frontier for each year it
+// has outgoing edges in. Each per-year search only traverses edges
+// from that year, so individual searches are small even though
+// there are many of them.
+// SAME-YEAR + DESCENDING DATE + TROPHY PROXIMITY (DEV branch)
+// Drop-in replacement for discoverTrophies in src/App.jsx.
+//
+// Three constraints layered together:
+// 1. All hops in a chain must occur in the same calendar year.
+// 2. Within that year, dates must descend (each hop <= previous).
+// 3. The trophy year must be within 1 year of the chain year.
+
 function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
   const bestCeiling = new Map();
-  bestCeiling.set(startTeam, "9999-12-31");
+  bestCeiling.set(startTeam + "|null", "9999-12-31");
 
-  const queue = [{ team: startTeam, depth: 0, ceiling: "9999-12-31", path: [] }];
+  const queue = [{ team: startTeam, depth: 0, chainYear: null, ceiling: "9999-12-31", path: [] }];
   const results = new Map();
 
   let head = 0;
   while (head < queue.length) {
-    const { team, depth, ceiling, path } = queue[head++];
+    const { team, depth, chainYear, ceiling, path } = queue[head++];
 
     // check trophies at this node
     const trophies = champMap.get(team);
     if (trophies && path.length > 0) {
-      const arrivalDate = path[path.length - 1].date;
       for (const t of trophies) {
-        // arrival date's year must be >= championship year
-        if (arrivalDate >= String(t.year)) {
-          if (!results.has(t.trophy)) results.set(t.trophy, { trophy: t.trophy, years: {} });
-          const entry = results.get(t.trophy);
-          if (!entry.years[t.year]) {
-            entry.years[t.year] = { year: t.year, team: t.team, path: [...path] };
-          }
+        // trophy year must be within 1 year of the chain year
+        if (Number(chainYear) - t.year > 1) continue;
+        // trophy year must not be in the future relative to the chain
+        if (t.year > Number(chainYear)) continue;
+
+        if (!results.has(t.trophy)) results.set(t.trophy, { trophy: t.trophy, years: {} });
+        const entry = results.get(t.trophy);
+        if (!entry.years[t.year]) {
+          entry.years[t.year] = { year: t.year, team: t.team, path: [...path] };
         }
       }
     }
@@ -58,23 +70,31 @@ function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
     if (depth >= maxDepth) continue;
 
     for (const edge of (graph.get(team) || [])) {
-      const edgeDate = edge.date;
-      // temporal constraint: this edge must predate (or equal) the ceiling
-      if (edgeDate > ceiling) continue;
+      const edgeYear = edge.date ? edge.date.slice(0, 4) : "unknown";
+      if (edgeYear === "unknown") continue;
 
-      // dominance: skip if we already reached this team with a higher ceiling
-      const prev = bestCeiling.get(edge.loser);
-      if (prev !== undefined && prev >= edgeDate) continue;
-      bestCeiling.set(edge.loser, edgeDate);
+      // first hop establishes the chain year; subsequent hops must match
+      if (chainYear !== null && edgeYear !== chainYear) continue;
+      const nextChainYear = chainYear || edgeYear;
+
+      // preserve descending-date ordering within the year
+      if (edge.date > ceiling) continue;
+
+      // dominance: skip if we already reached this team with a higher ceiling in this year
+      const key = edge.loser + "|" + nextChainYear;
+      const prev = bestCeiling.get(key);
+      if (prev !== undefined && prev >= edge.date) continue;
+      bestCeiling.set(key, edge.date);
 
       queue.push({
         team: edge.loser,
         depth: depth + 1,
-        ceiling: edgeDate,
+        chainYear: nextChainYear,
+        ceiling: edge.date,
         path: [...path, {
           from: team, to: edge.loser,
           ws: edge.ws, ls: edge.ls,
-          date: edgeDate, comp: edge.comp,
+          date: edge.date, comp: edge.comp,
         }],
       });
     }
