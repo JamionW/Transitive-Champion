@@ -2,7 +2,7 @@
 
 Select any soccer team. Discover every championship they've "won" through transitive wins. If you beat a team that beat a team that won a trophy, that trophy is yours. Obviously.
 
-Built with React + Vite. Backed by 185,000+ match results across 8,300+ teams from 226 competitions (1888 to 2023).
+Built with React + Vite. Backed by 185,000+ match results across 8,300+ teams from 226 competitions (1888 to present).
 
 ## Quick Start
 
@@ -23,22 +23,35 @@ Open http://localhost:5173 and search for a team.
 │   └── graph_data.json     # match graph (~18 MB raw, ~3 MB gzipped by host)
 ├── src/
 │   ├── main.jsx            # React mount
-│   └── App.jsx             # main app component (search, DFS, display)
+│   └── App.jsx             # main app component (search, BFS, display)
 └── pipeline/
     ├── pipeline.py          # data ingestion script
-    └── data/
-        ├── manual_matches.json   # manually maintained results (CFC, etc.)
-        ├── championships.json    # trophy winners (chain endpoints)
-        └── team_name_map.json    # normalizes team name variants
+    ├── maintenance.py       # API-Football cache maintenance
+    ├── data/
+    │   ├── manual_matches.json   # manually maintained results (CFC, etc.)
+    │   ├── championships.json    # trophy winners (chain endpoints)
+    │   └── team_name_map.json    # normalizes team name variants
+    └── sources/
+        ├── transfermarkt.py      # transfermarkt-datasets parser
+        ├── thecup.py             # US Open Cup results
+        └── api_football.py       # API-Football cached results
 ```
 
 ## How It Works
 
-The app loads `graph_data.json` at runtime (fetched from `public/`, not bundled). When you select a team, it runs a depth-first search through the win graph, capped at 8 hops, finding every path to a championship-holding team. Results are grouped by trophy and sorted by tier.
+The app loads `graph_data.json` at runtime (fetched from `public/`, not bundled). When you select a team, it runs a time-constrained BFS through the win graph, capped at 8 hops, finding every path to a championship-holding team. Each hop must use a match date equal to or earlier than the previous hop, and the final hop must postdate the championship year. Results are grouped by trophy and sorted by tier.
 
 ## Data Pipeline
 
-The graph data comes from the [schochastics/football-data](https://github.com/schochastics/football-data) parquet file (1.2M+ matches), compressed to one edge per winner/loser pair (keeping the highest margin). Manually maintained results in `pipeline/data/manual_matches.json` fill in teams below the dataset's coverage floor (e.g. MLS NEXT Pro).
+The graph is built from multiple sources, merged in order of priority:
+
+1. [schochastics/football-data](https://github.com/schochastics/football-data) parquet file (1.2M+ matches)
+2. transfermarkt-datasets (~80k European/international matches)
+3. US Open Cup results
+4. API-Football cached results
+5. Manual overrides from `pipeline/data/manual_matches.json`
+
+Later sources take precedence during compression. The compressor keeps one edge per (winner, loser, year) triple, retaining the highest goal margin for each.
 
 ### Rebuilding the data
 
@@ -52,6 +65,17 @@ python pipeline.py
 
 # then copy the output
 cp output/graph_data.json ../public/
+```
+
+### Pipeline options
+
+```
+--skip-download      use cached parquet instead of re-downloading
+--force-download     re-download parquet even if cached
+--stats              print dataset statistics only, no output file
+--no-transfermarkt   skip transfermarkt source
+--no-open-cup        skip US Open Cup source
+--no-api-football    skip API-Football cache
 ```
 
 ### Adding match results
@@ -87,3 +111,7 @@ Edit `pipeline/data/championships.json`:
 ## Data Attribution
 
 Match data from [schochastics/football-data](https://github.com/schochastics/football-data), provided under the [Open Data Commons Attribution License](https://opendatacommons.org/licenses/by/1-0/index.html).
+
+## License
+
+MIT

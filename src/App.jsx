@@ -220,7 +220,7 @@ export default function App() {
               }} />
             ))}
           </div>
-          <div style={{ color: "#5A6577", fontSize: 13 }}>~185k edges across 8,300+ teams</div>
+          <div style={{ color: "#5A6577", fontSize: 13 }}>~800k edges across 13,000+ teams</div>
         </div>
       </div>
     );
