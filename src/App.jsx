@@ -604,13 +604,13 @@ export default function App() {
               A transitive championship claim requires a chain of wins connecting your
               team to a trophy holder. All wins in the chain must occur within the same
               calendar year, representing a single season's worth of competitive form.
-              One "adjacent year" crossing is allowed at either end of the chain: your
+              One "adjacent year" crossing is allowed at either end of the chain. Your
               team's initial win may come from the following season, or the trophy itself
               may have been won the previous season, but not both. Within a given year,
               match date ordering is relaxed; the year constraint alone defines the
               competitive window. The idea is that a team's "season form" is more
-              representative of their general performance as opposed to strict date 
-              ordering. Or something like that. It's not that serious, anyway.
+              representative of their general performance rather than strict date 
+              ordering. Or something like that. It's not that serious.
               Chains are capped at 8 hops.
             </p>
           </div>
