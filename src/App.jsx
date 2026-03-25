@@ -146,6 +146,7 @@ export default function App() {
   const [expandedYear, setExpandedYear] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [computing, setComputing] = useState(false);
+  const [showMethodology, setShowMethodology] = useState(false);
   const searchRef = useRef(null);
 
   const [trophyResults, setTrophyResults] = useState(null);
@@ -560,7 +561,61 @@ export default function App() {
             Want to support this app and the Chattahooligans? Click here!
           </a>
         </div>
+        <div style={{ textAlign: "center", paddingTop: 8 }}>
+          <span
+            onClick={() => setShowMethodology(true)}
+            style={{
+              color: "#5A6577", fontSize: 11, cursor: "pointer",
+              textDecoration: "underline", textUnderlineOffset: 3,
+            }}
+          >
+            Methodology
+          </span>
+        </div>
       </div>
+      {showMethodology && (
+        <div
+          onClick={() => setShowMethodology(false)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+            display: "flex", alignItems: "flex-end", justifyContent: "center",
+            zIndex: 1000, padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#131B2E", border: "1px solid #1E2A42", borderRadius: 12,
+              padding: "24px 28px", maxWidth: 640, width: "100%", marginBottom: 24,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ color: "#D4A843", fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Methodology
+              </span>
+              <span
+                onClick={() => setShowMethodology(false)}
+                style={{ color: "#5A6577", cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+              >
+                ✕
+              </span>
+            </div>
+            <p style={{ color: "#A0A9B8", fontSize: 13, lineHeight: 1.7, margin: 0 }}>
+              A transitive championship claim requires a chain of wins connecting your
+              team to a trophy holder. All wins in the chain must occur within the same
+              calendar year, representing a single season's worth of competitive form.
+              One "adjacent year" crossing is allowed at either end of the chain: your
+              team's initial win may come from the following season, or the trophy itself
+              may have been won the previous season, but not both. Within a given year,
+              match date ordering is relaxed; the year constraint alone defines the
+              competitive window. The idea is that a team's "season form" is more
+              representative of their general performance as opposed to strict date 
+              ordering. Or something like that. It's not that serious, anyway.
+              Chains are capped at 8 hops.
+            </p>
+          </div>
+        </div>
+      )}
       <Analytics />
       <SpeedInsights />
     </div>
