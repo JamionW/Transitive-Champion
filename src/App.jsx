@@ -20,44 +20,48 @@ function buildGraph(matches) {
   return graph;
 }
 
-// SAME-YEAR VARIANT (DEV branch)
-// Replaces the existing discoverTrophies function in src/App.jsx.
-//
-// Change from production: instead of a descending-date ceiling,
-// the first hop's calendar year locks the entire chain. Every
-// subsequent hop must occur in that same year.
-//
-// The start team seeds a separate BFS frontier for each year it
-// has outgoing edges in. Each per-year search only traverses edges
-// from that year, so individual searches are small even though
-// there are many of them.
-// SAME-YEAR + DESCENDING DATE + TROPHY PROXIMITY (DEV branch)
+// SAME-YEAR + ONE ADJACENCY BUDGET (DEV branch v3)
 // Drop-in replacement for discoverTrophies in src/App.jsx.
 //
-// Three constraints layered together:
-// 1. All hops in a chain must occur in the same calendar year.
-// 2. Within that year, dates must descend (each hop <= previous).
-// 3. The trophy year must be within 1 year of the chain year.
+// Core rule: all hops in a chain share a calendar year.
+// One "year boundary crossing" is allowed, spendable at either end:
+//   - A mid-chain hop shifts chainYear down by 1 (the starting
+//     team's win was in a later season than the rest of the chain).
+//   - OR the trophy year is chainYear - 1 (the title was won the
+//     previous season).
+// Once spent, the other end must match chainYear exactly.
 
 function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
-  const bestCeiling = new Map();
-  bestCeiling.set(startTeam + "|null", "9999-12-31");
+  // dominance: per (team, chainYear), track best adjacentUsed seen.
+  // false is strictly better than true (more flexibility remains).
+  const bestState = new Map();
 
-  const queue = [{ team: startTeam, depth: 0, chainYear: null, ceiling: "9999-12-31", path: [] }];
+  const queue = [{
+    team: startTeam,
+    depth: 0,
+    chainYear: null,
+    adjacentUsed: false,
+    path: [],
+  }];
   const results = new Map();
 
   let head = 0;
   while (head < queue.length) {
-    const { team, depth, chainYear, ceiling, path } = queue[head++];
+    const { team, depth, chainYear, adjacentUsed, path } = queue[head++];
 
     // check trophies at this node
     const trophies = champMap.get(team);
     if (trophies && path.length > 0) {
+      const cy = Number(chainYear);
       for (const t of trophies) {
-        // trophy year must be within 1 year of the chain year
-        if (Number(chainYear) - t.year > 1) continue;
-        // trophy year must not be in the future relative to the chain
-        if (t.year > Number(chainYear)) continue;
+        if (t.year > cy) continue;
+        if (t.year === cy) {
+          // always valid
+        } else if (t.year === cy - 1 && !adjacentUsed) {
+          // spend the adjacency budget on the trophy end
+        } else {
+          continue;
+        }
 
         if (!results.has(t.trophy)) results.set(t.trophy, { trophy: t.trophy, years: {} });
         const entry = results.get(t.trophy);
@@ -73,24 +77,37 @@ function discoverTrophies(graph, startTeam, champMap, maxDepth = 8) {
       const edgeYear = edge.date ? edge.date.slice(0, 4) : "unknown";
       if (edgeYear === "unknown") continue;
 
-      // first hop establishes the chain year; subsequent hops must match
-      if (chainYear !== null && edgeYear !== chainYear) continue;
-      const nextChainYear = chainYear || edgeYear;
+      let nextChainYear = chainYear;
+      let nextAdjacentUsed = adjacentUsed;
 
-      // preserve descending-date ordering within the year
-      if (edge.date > ceiling) continue;
+      if (chainYear === null) {
+        // first hop sets chain year
+        nextChainYear = edgeYear;
+      } else if (edgeYear === chainYear) {
+        // same year, no budget spent
+      } else if (edgeYear === String(Number(chainYear) - 1) && !adjacentUsed) {
+        // adjacent year: spend the budget, shift chain year down
+        nextChainYear = edgeYear;
+        nextAdjacentUsed = true;
+      } else {
+        continue;
+      }
 
-      // dominance: skip if we already reached this team with a higher ceiling in this year
+      // dominance: false (budget unspent) dominates true (budget spent)
       const key = edge.loser + "|" + nextChainYear;
-      const prev = bestCeiling.get(key);
-      if (prev !== undefined && prev >= edge.date) continue;
-      bestCeiling.set(key, edge.date);
+      const prev = bestState.get(key);
+      if (prev !== undefined) {
+        if (!prev) continue;                        // already seen with budget intact
+        if (prev && nextAdjacentUsed) continue;     // already seen with same or worse state
+        // prev === true && !nextAdjacentUsed: we're strictly better, proceed
+      }
+      bestState.set(key, nextAdjacentUsed);
 
       queue.push({
         team: edge.loser,
         depth: depth + 1,
         chainYear: nextChainYear,
-        ceiling: edge.date,
+        adjacentUsed: nextAdjacentUsed,
         path: [...path, {
           from: team, to: edge.loser,
           ws: edge.ws, ls: edge.ls,
